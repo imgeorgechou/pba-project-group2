@@ -239,6 +239,15 @@ fig3 <- ggplot() +
 # Display Figure 3
 print(fig3)
 
+# Save Figure 3
+ggsave(
+  "figures/figure3_station_locations.png",
+  plot = fig3,
+  width = 10,
+  height = 7,
+  dpi = 300
+)
+
 # ============================================================
 # Figure 4: Parallel Trends - CRZ vs. Queens
 # ============================================================
