@@ -1027,7 +1027,16 @@ trips[
   .N
 ]
 
+
 # Step 39: Calculate daily ridership for all 36 months
+
+# Identify all CRZ stations (not only stable stations)
+crz_ids <- station_sf$station_id[station_sf$in_crz]
+
+# Identify control stations
+control_ids <- stable_stations[
+  group == "Control", station_id
+]
 
 daily_list <- lapply(clean_files, function(file) {
   
@@ -1051,15 +1060,21 @@ daily_list <- lapply(clean_files, function(file) {
   trips[, end_date := as.IDate(substr(ended_at, 1, 10))]
   
   # Count daily borrowings
+  # Exclude Queens-to-CRZ trips from control stations
   borrows <- trips[
-    start_station_id %in% stable_stations$station_id,
+    start_station_id %in% stable_stations$station_id &
+      !(start_station_id %in% control_ids &
+          end_station_id %in% crz_ids),
     .(borrows = .N),
     by = .(date = start_date, station_id = start_station_id)
   ]
   
   # Count daily returns
+  # Exclude CRZ-to-Queens trips from control stations
   returns <- trips[
-    end_station_id %in% stable_stations$station_id,
+    end_station_id %in% stable_stations$station_id &
+      !(end_station_id %in% control_ids &
+          start_station_id %in% crz_ids),
     .(returns = .N),
     by = .(date = end_date, station_id = end_station_id)
   ]
@@ -1107,6 +1122,8 @@ range(daily_all$date)
 uniqueN(daily_all$station_id)
 nrow(daily_all)
 head(daily_all)
+
+
 # Step 40: Create a balanced station-day panel
 
 # Create all combinations of stations and dates
@@ -1142,6 +1159,7 @@ nrow(balanced_panel)
 uniqueN(balanced_panel$station_id)
 range(balanced_panel$date)
 balanced_panel[, sum(missing_record)]
+
 
 # Step 41: Add treatment, policy, and time variables
 
@@ -1188,6 +1206,7 @@ balanced_panel[, .N, by = .(group, post)]
 balanced_panel[, sum(is.na(group))]
 head(balanced_panel)
 
+
 # Step 42: Create log-transformed ridership
 
 balanced_panel[, log_ridership := log1p(ridership)]
@@ -1211,6 +1230,8 @@ head(
     .(date, station_id, group, ridership, log_ridership)
   ]
 )
+
+
 # Step 43: Prepare peak and off-peak ridership data
 
 library(data.table)
@@ -1264,8 +1285,11 @@ peak_list <- lapply(clean_files, function(file) {
   )]
   
   # Count borrowings
+  # Exclude Queens-to-CRZ trips from control stations
   borrows <- trips[
-    start_station_id %in% stable_stations$station_id,
+    start_station_id %in% stable_stations$station_id &
+      !(start_station_id %in% control_ids &
+          end_station_id %in% crz_ids),
     .(borrows = .N),
     by = .(
       date = start_date,
@@ -1275,8 +1299,11 @@ peak_list <- lapply(clean_files, function(file) {
   ]
   
   # Count returns
+  # Exclude CRZ-to-Queens trips from control stations
   returns <- trips[
-    end_station_id %in% stable_stations$station_id,
+    end_station_id %in% stable_stations$station_id &
+      !(end_station_id %in% control_ids &
+          start_station_id %in% crz_ids),
     .(returns = .N),
     by = .(
       date = end_date,
@@ -1335,6 +1362,8 @@ peak_daily[
 # Check consistency with daily data
 peak_daily[, sum(ridership)]
 daily_all[, sum(ridership)]
+
+
 # Step 44: Create a balanced peak/off-peak panel
 
 # Create all station-date-period combinations
@@ -1386,30 +1415,53 @@ nrow(peak_panel)
 peak_panel[, .N, by = period]
 peak_panel[, sum(is.na(group))]
 peak_panel[, sum(ridership)]
+
+
 # Step 45: Save processed datasets
 
 # Create output directory
 dir.create("data_processed", showWarnings = FALSE)
 
-# Save daily station-level panel
+# Save updated daily station-level panel
 saveRDS(
   balanced_panel,
-  "data_processed/station_daily_panel.rds"
+  "data_processed/station_daily_panel_updated.rds"
 )
 
-# Save peak/off-peak panel
+# Save updated peak/off-peak panel
 saveRDS(
   peak_panel,
-  "data_processed/peak_offpeak_panel.rds"
+  "data_processed/peak_offpeak_panel_updated.rds"
 )
 
-# Save station locations and treatment groups
+# Save updated station locations and treatment groups
 saveRDS(
   station_sf,
-  "data_processed/station_locations.rds"
+  "data_processed/station_locations_updated.rds"
 )
 
 # Verify saved files
-file.exists("data_processed/station_daily_panel.rds")
-file.exists("data_processed/peak_offpeak_panel.rds")
-file.exists("data_processed/station_locations.rds")
+file.exists("data_processed/station_daily_panel_updated.rds")
+file.exists("data_processed/peak_offpeak_panel_updated.rds")
+file.exists("data_processed/station_locations_updated.rds")
+
+
+# Final validation
+
+# Check treatment and control totals
+balanced_panel[
+  ,
+  .(total = sum(ridership)),
+  by = group
+]
+
+# Check daily and peak/off-peak consistency
+peak_daily[, sum(ridership)]
+daily_all[, sum(ridership)]
+
+# Check panel dimensions
+nrow(balanced_panel)
+nrow(peak_panel)
+
+# Check zero-filled station-days
+balanced_panel[, sum(missing_record)]
