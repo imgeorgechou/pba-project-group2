@@ -26,15 +26,15 @@ library(sf)
 
 # Load prepared datasets
 daily_panel <- readRDS(
-  "data_processed/station_daily_panel.rds"
+  "rds/station_daily_panel.rds"
 )
 
 peak_panel <- readRDS(
-  "data_processed/peak_offpeak_panel.rds"
+  "rds/peak_offpeak_panel.rds"
 )
 
 station_locations <- readRDS(
-  "data_processed/station_locations.rds"
+  "rds/station_locations.rds"
 )
 
 # Create folder for figures
