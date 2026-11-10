@@ -316,3 +316,71 @@ ggsave(
   dpi = 300
 )
 
+# ============================================================
+# Figure 5: Gap in Log Ridership (Treatment - Control)
+# ============================================================
+
+# Keep complete weeks only (first week has 1 day, last week has 3 days)
+week_days <- daily_panel[, .(n_days = uniqueN(date)), by = week]
+full_weeks <- week_days[n_days == 7, week]
+
+# Reshape to wide format: one row per week, one column per group
+gap_weekly <- dcast(
+  weekly_ridership[week %in% full_weeks],
+  week ~ group,
+  value.var = "avg_log_ridership"
+)
+
+# Gap = Treatment - Control
+gap_weekly[, gap := Treatment - Control]
+
+# Average gap before and after the policy
+# (the week of Dec 30, 2024 - Jan 5, 2025 straddles the policy date and is excluded)
+pre_mean <- gap_weekly[week < as.Date("2024-12-30"), mean(gap)]
+post_mean <- gap_weekly[week >= as.Date("2025-01-06"), mean(gap)]
+
+pre_mean
+post_mean
+
+fig5 <- ggplot(gap_weekly, aes(x = week, y = gap)) +
+  geom_line(linewidth = 0.9, color = "#8064A2") +
+  geom_hline(
+    yintercept = pre_mean,
+    linetype = "dotted",
+    color = "grey40"
+  ) +
+  geom_vline(
+    xintercept = as.Date("2025-01-05"),
+    linetype = "dashed",
+    color = "red",
+    linewidth = 0.8
+  ) +
+  scale_x_date(
+    date_breaks = "6 months",
+    date_labels = "%Y-%m"
+  ) +
+  labs(
+    title = "Gap in Log Ridership: CRZ minus Queens",
+    subtitle = "Weekly Average ln(Daily Trips + 1), Treatment - Control (2023–2025)",
+    x = "Week",
+    y = "Difference in Average Log Ridership",
+    caption = "Dotted line: pre-policy mean gap. Dashed line: Congestion Pricing implementation (Jan 5, 2025)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+# Display Figure 5
+print(fig5)
+
+# Save Figure 5
+ggsave(
+  "figures/figure5_gap_trend.png",
+  plot = fig5,
+  width = 11,
+  height = 6,
+  dpi = 300
+)
+
